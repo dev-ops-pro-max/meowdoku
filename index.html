@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meowdoku</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sky:#DCEEF0; --sky2:#C7E5EA; --paper:#FEFEFE;
+  --ink:#1C1C1C; --teal:#1B6B7C; --teal-deep:#124B58;
+  --teal-soft:#EAF6F8;
+  --b1:#8ED9E8; --b2:#63A7E0; --b3:#4150CE;
+  --sun:#F2A33C; --sun-soft:#FBE8CE; --bad:#E25B45;
+  --wobble:255px 18px 225px 18px / 18px 225px 18px 255px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+body{
+  min-height:100dvh; font-family:'Baloo 2',cursive; color:var(--ink);
+  background:
+    radial-gradient(circle at 12% 18%, #ffffff7d 0 22px, transparent 23px),
+    radial-gradient(circle at 78% 8%, #ffffff61 0 16px, transparent 17px),
+    radial-gradient(circle at 88% 62%, #ffffff52 0 26px, transparent 27px),
+    radial-gradient(circle at 8% 72%, #ffffff4d 0 20px, transparent 21px),
+    radial-gradient(circle at 45% 45%, #ffffff33 0 14px, transparent 15px),
+    linear-gradient(180deg, var(--sky) 0%, var(--sky2) 100%);
+  display:flex; align-items:center; justify-content:center; padding:14px;
+}
+.screen{width:100%; max-width:430px; display:none}
+.screen.on{display:block}
+
+/* ---------- ink & wobble ---------- */
+.panel{
+  background:var(--paper); border:3px solid var(--ink); border-radius:var(--wobble);
+}
+.btn{
+  font-family:'Baloo 2',cursive; font-weight:800; font-size:1.3rem; color:var(--teal); background:var(--paper);
+  border:3px solid var(--ink); border-radius:var(--wobble); padding:.55rem 1.6rem; cursor:pointer;
+  transition:transform .1s ease;
+}
+.btn:hover{transform:translateY(-2px) rotate(-1deg)}
+.btn:active{transform:translateY(0) scale(.97)}
+.btn:focus-visible,.cell:focus-visible,.key:focus-visible,.tool:focus-visible{outline:3px solid var(--b2); outline-offset:2px}
+.btn.small{font-size:1rem; padding:.3rem 1rem}
+
+/* ---------- menu ---------- */
+.title-wrap{position:relative; text-align:center; padding:2rem 1rem .8rem}
+.title-wrap .due{width:62%; min-width:230px}
+.brand{
+  font-weight:800; font-size:clamp(3.2rem,14vw,4.4rem); line-height:.95;
+  -webkit-text-stroke:2.5px var(--ink); background:linear-gradient(100deg,var(--b1) 8%,var(--b2) 52%,var(--b3) 95%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.brand span{display:inline-block}
+.brand span:nth-child(odd){transform:rotate(2.5deg)}
+.brand span:nth-child(even){transform:rotate(-2deg)}
+.brand span:nth-child(4n){transform:rotate(3.5deg) translateY(3px)}
+.menu-actions{display:grid; gap:.9rem; margin:1.3rem auto 0; max-width:270px}
+.menu-foot{display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; padding:1.6rem 1.2rem 1rem}
+.menu-foot .btn{width:56px; height:56px; font-size:1.6rem; padding:0; display:grid; place-items:center}
+.menu-foot .whisper{font-family:Gaegu,cursive; font-weight:700; color:var(--teal); font-size:1rem; line-height:1.35}
+
+/* ---------- difficulty ---------- */
+#difficulty{max-width:360px}
+#difficulty h2{font-weight:800; font-size:1.7rem; margin-top:1.4rem}
+.diff-list{display:grid; gap:.8rem; padding:1.1rem}
+.diff{text-align:left; padding:.55rem 1.1rem; display:flex; align-items:baseline; justify-content:space-between; gap:.8rem}
+.diff b{font-size:1.35rem; flex-shrink:0}
+.diff small{font-family:Gaegu,cursive; font-weight:700; color:var(--teal); font-size:1rem; text-align:right}
+
+/* ---------- hud ---------- */
+.hud{display:flex; align-items:center; justify-content:space-between; padding:.5rem .4rem .6rem}
+.game-panel .hud{padding-right:122px}   /* stay clear of the peeking cat */
+.lives{font-weight:800; font-size:1.2rem; display:flex; gap:.25rem}
+.timer{font-family:Gaegu,cursive; font-weight:700; font-size:1.45rem; color:var(--teal)}
+.hud .btn{width:46px; height:46px; padding:0; display:grid; place-items:center; font-size:1.3rem}
+
+/* ---------- board ---------- */
+.board-wrap{position:relative}
+.peek{position:absolute; top:-52px; right:8px; width:112px; pointer-events:none; z-index:1}
+.board{
+  display:grid; grid-template-columns:repeat(9,1fr); background:var(--teal);
+  border:3px solid var(--ink); border-radius:var(--wobble); padding:6px;
+}
+.cell{
+  aspect-ratio:1; background:var(--paper); border:.5px solid #1b6b7c45;
+  font-family:'Baloo 2',cursive; font-weight:700; font-size:clamp(1.05rem,4.2vw,1.4rem);
+  color:var(--teal); display:grid; place-items:center; cursor:pointer; padding:0; position:relative;
+  user-select:none; -webkit-user-select:none;
+}
+.cell.b-r2{border-right:2.5px solid var(--teal)}
+.cell.b-b2{border-bottom:2.5px solid var(--teal)}
+.cell.given{background:#F0F7F8; color:#134A56; cursor:default}
+.mine{background:var(--paper)}
+.sel{background:var(--sun-soft)}
+.peer{background:#EAF2F4}
+.same{box-shadow:inset 0 0 0 2.5px var(--b2)}
+.wrong{background:#F7DAD4}
+.wrong .val{color:var(--bad)}
+.cell .val{pointer-events:none}
+.pop{animation:pop .18s ease-out}
+@keyframes pop{from{transform:scale(.55)}to{transform:scale(1)}}
+@keyframes shake{20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+.shake{animation:shake .3s}
+.notes{display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);
+  position:absolute; inset:2px; pointer-events:none}
+.notes i{font-style:normal; font-size:min(.44em,10px); line-height:1; font-weight:500; color:var(--ink); display:grid; place-items:center}
+.paused .board, .paused .keys{filter:blur(9px)}
+
+/* ---------- keypad & tools ---------- */
+.pad{padding:.9rem .6rem .8rem}
+.keys{display:grid; grid-template-columns:repeat(9,1fr); gap:.4rem}
+.key{
+  position:relative; background:var(--paper); border:2.5px solid var(--ink); border-radius:var(--wobble);
+  font-family:'Baloo 2',cursive; font-weight:800; font-size:clamp(1.15rem,4vw,1.45rem);
+  color:var(--teal); aspect-ratio:.8; cursor:pointer; display:grid; place-items:center;
+}
+.key .rem{position:absolute; bottom:1px; right:3px; font-family:Gaegu,cursive; font-weight:700;
+  font-size:.68rem; color:var(--teal); line-height:1}
+.k-done{color:#9dbcc4; border-color:#9dbcc4}
+.k-done .rem{color:#9dbcc4}
+.tools{display:flex; align-items:center; gap:.7rem; margin-top:1.15rem; padding:0 .2rem}
+.tool{
+  border:2.5px solid var(--ink); border-radius:14px; background:var(--paper); color:var(--ink);
+  padding:.5rem .7rem; font-size:1.05rem; font-weight:700; cursor:pointer; line-height:1;
+  font-family:'Baloo 2',cursive;
+}
+.tool.on{background:var(--b2); color:#fff}
+.eraser{color:var(--teal)}
+.spacer{flex:1}
+
+/* ---------- dialogs ---------- */
+dialog{
+  border:3px solid var(--ink); border-radius:var(--wobble); padding:1.4rem 1.5rem;
+  background:var(--paper); color:var(--ink); width:min(92vw,340px); text-align:center;
+  font-family:'Baloo 2',cursive;
+}
+dialog::backdrop{background:#1b6b7c66}
+dialog h2{font-weight:800; font-size:1.7rem}
+dialog p{font-family:Gaegu,cursive; font-size:1.12rem; line-height:1.5}
+dialog .rows{display:grid; gap:.7rem; margin-top:1.1rem}
+dialog .btn{width:100%}
+.dialog-cat{width:90px; margin:.4rem auto .5rem}
+.stats{font-family:Gaegu,cursive; font-weight:700; color:var(--teal); font-size:1.15rem}
+.win-cat{animation:bounce .9s ease infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-12px)}}
+.vol{display:flex; gap:.6rem; align-items:center; margin:1rem 0}
+.vol input{width:100%; accent-color:var(--teal)}
+.known{border-radius:14px; padding:.7rem .8rem; font-family:Gaegu,cursive; font-size:1rem; color:var(--teal); background:var(--teal-soft)}
+kbd{font-family:Gaegu,cursive; border:1.5px solid var(--ink); border-radius:7px; padding:0 .35em; background:#fff; font-size:.95em}
+
+/* ---------- responsive & a11y ---------- */
+@media (min-width:760px){
+  body{padding:28px}
+  .screen{max-width:470px}
+  .panel.game-panel{padding:.7rem 1rem 1.15rem}
+  .panel.game-panel .hud{padding-right:130px}
+  .peek{width:128px; top:-58px; right:14px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .peek{animation:peekbob 6s ease-in-out infinite}
+  @keyframes peekbob{0%,86%,100%{transform:translateY(0)}90%,96%{transform:translateY(3px)}}
+}
+@media (prefers-reduced-motion:reduce){ .btn,.win-cat,.peek{animation:none!important; transition:none} }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="cathead" viewBox="0 0 120 100" fill="none" stroke="#1c1c1c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#fff" d="M14 52 C14 24 34 10 60 10 C86 10 106 24 106 52 C106 78 80 92 60 92 C40 92 14 78 14 52 Z"/>
+    <path fill="#fff" d="M22 34 L14 4 L44 16 Z"/><path fill="#fff" d="M98 34 L106 4 L76 16 Z"/>
+    <path d="M56 22 c5 5 13 5 18 0" stroke="#1c1c1c" stroke-width="4"/>
+    <path d="M30 27 l-14 -6 M30 34 l-15 0 M90 27 l14 -6 M90 34 l15 0" stroke="#1c1c1c" stroke-width="4"/>
+    <path class="eyeL" d="M38 50 q6 -7 12 0" stroke-width="5"/>
+    <path class="eyeR" d="M70 50 q6 -7 12 0" stroke-width="5"/>
+    <path class="maw" d="M50 64 q5 6 10 0 q5 6 10 0" stroke-width="4.5"/>
+  </symbol>
+  <symbol id="catpaw" viewBox="0 0 40 40" fill="none">
+    <path d="M20 34c-5 0-8-3-8-7a8 8 0 1 1 16 0c0 4-3 7-8 7z" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="8.5" cy="15" r="3.8" fill="currentColor" stroke="currentColor" stroke-width="2.5"/>
+    <circle cx="16.5" cy="9" r="4.2" fill="currentColor" stroke="currentColor" stroke-width="2.5"/>
+    <circle cx="27"  cy="9.5" r="4.2" fill="currentColor" stroke="currentColor" stroke-width="2.5"/>
+    <circle cx="33.5" cy="16" r="3.8" fill="currentColor" stroke="currentColor" stroke-width="2.5"/>
+  </symbol>
+</svg>
+
+<main>
+<!-- ============ MENU ============ -->
+<section id="menu" class="screen on" aria-label="Main menu">
+  <div class="title-wrap">
+    <svg class="due" viewBox="0 0 260 120" aria-hidden="true"><use href="#cathead" x="72" width="130" height="110" transform="rotate(-10 140 60)"/></svg>
+    <h1 class="brand" aria-label="Meowdoku"><span>M</span><span>E</span><span>O</span><span>W</span><span>D</span><span>O</span><span>K</span><span>U</span></h1>
+  </div>
+  <div class="menu-actions">
+    <button class="btn" id="btnPlay">Play</button>
+    <button class="btn" id="btnContinue" disabled>Continue</button>
+    <button class="btn small" id="btnHow">How to play</button>
+  </div>
+  <div class="menu-foot">
+    <button class="btn" id="btnSettings" aria-label="Settings">⚙</button>
+    <p class="whisper">every row, column and box wants all nine digits.<br>three lives. don't guess the wrong cat.</p>
+  </div>
+</section>
+
+<!-- ============ DIFFICULTY ============ -->
+<section id="difficulty" class="screen" aria-label="Difficulty select">
+  <div class="panel" style="text-align:center">
+    <h2>Pick a difficulty</h2>
+    <div class="diff-list">
+      <button class="btn diff" data-d="easy"><b>Easy</b><small>45 givens · stretch your paws</small></button>
+      <button class="btn diff" data-d="medium"><b>Medium</b><small>38 givens · a proper hunt</small></button>
+      <button class="btn diff" data-d="hard"><b>Hard</b><small>32 givens · claws out</small></button>
+      <button class="btn diff" data-d="expert"><b>Expert</b><small>27 givens · nine lives</small></button>
+    </div>
+    <button class="btn small" id="btnDiffBack" style="margin:.7rem 0 1.2rem">Back</button>
+  </div>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="screen" aria-label="Game">
+  <div class="panel game-panel">
+    <div class="hud">
+      <button class="btn" id="btnPause" aria-label="Pause">⏸</button>
+      <div class="lives" id="lives" aria-label="Lives remaining"></div>
+      <div class="timer" id="timer">0:00</div>
+    </div>
+    <div class="board-wrap">
+      <svg class="peek" viewBox="0 0 120 110" aria-hidden="true"><use href="#cathead" y="4"/></svg>
+      <div class="board" id="board" role="grid" aria-label="Sudoku board"></div>
+    </div>
+    <div class="pad">
+      <div class="keys" id="keys"></div>
+      <div class="tools">
+        <button class="tool" id="toolNotes" aria-pressed="false" title="Notes (N)">✏ Notes</button>
+        <button class="tool eraser" id="toolErase" title="Erase (Backspace)">🧽 Erase</button>
+        <span class="spacer"></span>
+        <button class="btn small" id="btnMenu">Menu</button>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ============ DIALOGS ============ -->
+<dialog id="dlgHow">
+  <h2>How to play</h2>
+  <svg class="dialog-cat" viewBox="0 0 120 100"><use href="#cathead"/></svg>
+  <p>Fill the grid so every row, every column and every 3×3 box holds the digits 1–9 exactly once.<br>
+  Three lives — miss three times and it's over. <kbd>1</kbd>–<kbd>9</kbd> place · <kbd>Backspace</kbd> erase · <kbd>N</kbd> notes · arrows move.</p>
+  <form method="dialog"><button class="btn" style="margin-top:1rem">Got it</button></form>
+</dialog>
+
+<dialog id="dlgSettings">
+  <h2>Settings</h2>
+  <svg class="dialog-cat" viewBox="0 0 120 100"><use href="#cathead"/></svg>
+  <div class="vol"><span aria-hidden="true">🔊</span><input type="range" id="volume" min="0" max="100" value="55" aria-label="Volume"><span id="volVal">55%</span></div>
+  <div class="known">Known quirk: the celebrating cat only knows one jump, and it is extremely proud of it.</div>
+  <form method="dialog"><button class="btn" style="margin-top:1rem">Close</button></form>
+</dialog>
+
+<dialog id="dlgPause">
+  <h2>Paused</h2>
+  <svg class="dialog-cat" viewBox="0 0 120 100"><use href="#cathead"/></svg>
+  <p>The board is napping. So is your timer.</p>
+  <div class="rows">
+    <button class="btn" id="btnResume">Resume</button>
+    <button class="btn" id="btnPauseMenu">Back to menu</button>
+  </div>
+</dialog>
+
+<dialog id="dlgOver">
+  <h2>Game over</h2>
+  <svg class="dialog-cat" viewBox="0 0 120 100"><use href="#cathead"/></svg>
+  <p>Three strikes. The cat is unimpressed.</p>
+  <div class="rows">
+    <button class="btn" id="btnRetry">Try this board again</button>
+    <button class="btn" id="btnOverMenu">Back to menu</button>
+  </div>
+</dialog>
+
+<dialog id="dlgWin">
+  <h2>Solved!</h2>
+  <svg class="dialog-cat win-cat" viewBox="0 0 120 100"><use href="#cathead"/></svg>
+  <p>Full house, clean board, happy cat.</p>
+  <p class="stats" id="winStats"></p>
+  <div class="rows">
+    <button class="btn" id="btnAgain">New game</button>
+    <button class="btn small" id="btnWinMenu">Back to menu</button>
+  </div>
+</dialog>
+
+<script>
+(()=>{ 'use strict';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+
+/* ---------- sudoku generation (unique-solution puzzles) ---------- */
+const emptyGrid=()=>Array.from({length:9},()=>Array(9).fill(0));
+function ok(g,r,c,v){
+  for(let i=0;i<9;i++) if(g[r][i]===v||g[i][c]===v) return false;
+  const br=r-r%3, bc=c-c%3;
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++) if(g[br+i][bc+j]===v) return false;
+  return true;
+}
+function fillGrid(g){
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++) if(!g[r][c]){
+    for(const v of shuffle([1,2,3,4,5,6,7,8,9])) if(ok(g,r,c,v)){ g[r][c]=v; if(fillGrid(g)) return true; g[r][c]=0; }
+    return false;
+  }
+  return true;
+}
+function countSolutions(g,limit=2){
+  let n=0;
+  function spot(){ for(let r=0;r<9;r++)for(let c=0;c<9;c++) if(!g[r][c]) return [r,c]; return null; }
+  (function solve(){
+    const s=spot(); if(!s){ n++; return; }
+    for(let v=1;v<=9;v++) if(ok(g,s[0],s[1],v)){ g[s[0]][s[1]]=v; solve(); g[s[0]][s[1]]=0; if(n>=limit) return; }
+  })();
+  return n;
+}
+function buildPuzzle(givens){
+  const full=emptyGrid(); fillGrid(full);
+  const puzzle=full.map(o=>[...o]);
+  const cells=shuffle([...Array(81).keys()]);
+  let hidden=0;
+  for(const idx of cells){
+    if(hidden>=81-givens) break;
+    const r=Math.floor(idx/9), c=idx%9, back=puzzle[r][c];
+    puzzle[r][c]=0;
+    if(countSolutions(puzzle.map(o=>[...o]))!==1) puzzle[r][c]=back; else hidden++;
+  }
+  return {puzzle, solution:full};
+}
+
+/* ---------- state ---------- */
+const GIVENS={easy:45,medium:38,hard:32,expert:27};
+const S={ solution:null, puzzle:null, marks:null, notes:null, lives:3, sel:null,
+          pencil:false, time:0, tick:null, over:false, paused:false, diff:null, last:null };
+
+const boardEl=$('#board'), keysEl=$('#keys'), livesEl=$('#lives'), timerEl=$('#timer');
+const cells=[];
+for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+  const b=document.createElement('button');
+  b.className='cell'; b.dataset.r=r; b.dataset.c=c; b.type='button';
+  boardEl.appendChild(b); cells.push(b);
+}
+for(let d=1;d<=9;d++){
+  const k=document.createElement('button');
+  k.className='key'; k.dataset.d=d; k.type='button';
+  k.innerHTML=`${d}<em class="rem"></em>`;
+  keysEl.appendChild(k);
+}
+const cell=(r,c)=>cells[r*9+c];
+const val=(r,c)=>S.puzzle[r][c]||S.marks[r][c]||null;
+
+/* ---------- screens ---------- */
+function show(id){ $$('.screen').forEach(s=>s.classList.remove('on')); $(id).classList.add('on'); }
+
+/* ---------- rendering ---------- */
+function renderCell(r,c){
+  const el=cell(r,c), g=S.puzzle[r][c], m=S.marks[r][c];
+  let cls='cell';
+  if(c===2||c===5) cls+=' b-r2';
+  if(r===2||r===5) cls+=' b-b2';
+  el.className=cls;
+  el.textContent='';
+  if(g){ el.classList.add('given'); el.innerHTML=`<span class="val">${g}</span>`; }
+  else if(m){ el.classList.add('mine'); el.innerHTML=`<span class="val">${m}</span>`; }
+  else if(S.notes[r][c].length){
+    el.innerHTML='<span class="notes">'+Array.from({length:9},(_,i)=>`<i>${S.notes[r][c].includes(i+1)?i+1:''}</i>`).join('')+'</span>';
+  }
+  if(S.last&&S.last.r===r&&S.last.c===c&&S.last.bad) el.classList.add('wrong');
+  const v=g||m;
+  el.setAttribute('aria-label',`row ${r+1}, column ${c+1}: ${v? '= '+v : S.notes[r][c].length? 'notes '+S.notes[r][c].join(', ') : 'empty'}`);
+}
+function paintHL(){
+  const s=S.sel, sv=s? val(s.r,s.c) : null;
+  cells.forEach(el=>{
+    const r=+el.dataset.r, c=+el.dataset.c;
+    el.classList.remove('sel','peer','same');
+    if(!s) return;
+    if(r===s.r&&c===s.c){ el.classList.add('sel'); return; }
+    if(r===s.r||c===s.c||(Math.floor(r/3)===Math.floor(s.r/3)&&Math.floor(c/3)===Math.floor(s.c/3))) el.classList.add('peer');
+    const v=val(r,c);
+    if(v&&sv&&v===sv) el.classList.add('same');
+  });
+}
+function renderKeys(){
+  $$('.key').forEach(k=>{
+    const d=+k.dataset.d;
+    let n=0;
+    for(let r=0;r<9;r++)for(let c=0;c<9;c++) if(val(r,c)===d) n++;
+    const done=n>=9;
+    k.classList.toggle('k-done',done);
+    k.querySelector('.rem').textContent=done? '✓' : String(9-n);
+  });
+}
+function renderLives(){
+  /* three paw slots; used ones fade to pale teal */
+  const usedCount=3-S.lives;
+  livesEl.innerHTML=Array.from({length:3},(_,i)=>
+    `<svg width="26" height="26" role="img" aria-hidden="true" style="color:${i<usedCount?'#BFE0E7':'#F2A33C'}"><use href="#catpaw"/></svg>`
+  ).join('');
+}
+function renderBoard(){ for(let r=0;r<9;r++)for(let c=0;c<9;c++) renderCell(r,c); paintHL(); renderKeys(); renderLives(); }
+function renderAll(){ renderBoard(); }
+
+/* ---------- timer ---------- */
+const fmt=t=>`${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
+function startTimer(){ stopTimer(); S.tick=setInterval(()=>{ if(S.paused||S.over) return; S.time++; timerEl.textContent=fmt(S.time); },1000); }
+function stopTimer(){ clearInterval(S.tick); }
+
+/* ---------- moves ---------- */
+function selectCell(r,c){ S.sel={r,c}; paintHL(); }
+function place(d){
+  if(S.over||S.paused||!S.sel) return;
+  const r=S.sel.r, c=S.sel.c;
+  if(S.puzzle[r][c]) return;
+  if(S.pencil){
+    const arr=S.notes[r][c], i=arr.indexOf(d);
+    if(i>=0) arr.splice(i,1); else { arr.length=0; arr.push(d); }
+    renderAll(); save();
+    return;
+  }
+  if(S.solution[r][c]===d){
+    S.marks[r][c]=d; S.notes[r][c].length=0;
+    for(let i=0;i<9;i++){ rm(S.notes[r][i],d); rm(S.notes[i][c],d); }
+    const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+    for(let i=br;i<br+3;i++)for(let j=bc;j<bc+3;j++) rm(S.notes[i][j],d);
+    S.last={r,c,bad:false};
+    renderAll();
+    const el=cell(r,c); el.classList.add('pop'); setTimeout(()=>el.classList.remove('pop'),220);
+    if(val(r,c)&&countDone()===81) win();
+  } else {
+    S.lives--; S.last={r,c,bad:true};
+    renderAll(); const el=cell(r,c); el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),340);
+    renderLives();
+    if(S.lives<=0){ gameOver(); }
+  }
+  save();
+}
+function rm(arr,d){ const i=arr.indexOf(d); if(i>=0) arr.splice(i,1); }
+function countDone(){ let n=0; for(let r=0;r<9;r++)for(let c=0;c<9;c++) if(val(r,c)) n++; return n; }
+function erase(){
+  if(S.over||S.paused||!S.sel) return;
+  const r=S.sel.r, c=S.sel.c;
+  if(S.puzzle[r][c]) return;
+  S.marks[r][c]=null; S.notes[r][c].length=0;
+  S.last=null; renderAll(); save();
+}
+function togglePencil(){
+  S.pencil=!S.pencil;
+  const t=$('#toolNotes');
+  t.classList.toggle('on',S.pencil); t.setAttribute('aria-pressed',S.pencil);
+}
+
+/* ---------- new game / end ---------- */
+function newGame(diff){
+  stopTimer();
+  S.diff=diff; S.lives=3; S.time=0; S.over=false; S.paused=false; S.pencil=false; S.last=null; S.sel=null;
+  const {puzzle,solution}=buildPuzzle(GIVENS[diff]);
+  S.solution=solution;
+  S.puzzle=puzzle.map(o=>o.map(v=>v||null));
+  S.marks=S.puzzle.map(o=>o.map(()=>null));
+  S.notes=S.puzzle.map(o=>o.map(()=>[]));
+  $('#toolNotes').classList.remove('on');
+  timerEl.textContent='0:00';
+  startTimer(); show('#game'); renderBoard(); save();
+}
+function gameOver(){
+  S.over=true; stopTimer(); save();
+  $('#dlgOver').showModal();
+}
+function win(){
+  S.over=true; stopTimer(); clearSave();
+  $('#winStats').textContent=`${S.diff} · ${fmt(S.time)} · ${3-S.lives} misses`;
+  $('#btnAgain').textContent='New game';
+  $('#btnAgain').dataset.next='play';
+  $('#dlgWin').showModal();
+}
+
+/* ---------- persistence (the original's unfinished Continue, done right) ---------- */
+const KEY='meowdoku_save_v1';
+function save(){
+  if(!S.solution||S.over){ return; }
+  try{
+    localStorage.setItem(KEY,JSON.stringify({
+      diff:S.diff, puzzle:S.puzzle, solution:S.solution, marks:S.marks, notes:S.notes,
+      lives:S.lives, time:S.time, pencil:S.pencil
+    }));
+    $('#btnContinue').disabled=false;
+  }catch(e){}
+}
+function clearSave(){ try{ localStorage.removeItem(KEY); }catch(e){} $('#btnContinue').disabled=true; }
+function hasSave(){ try{ return !!localStorage.getItem(KEY); }catch(e){ return false; } }
+function loadSave(){
+  let d=null;
+  try{ d=JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+  if(!d) return false;
+  Object.assign(S,d,{over:false,paused:false,sel:null,last:null});
+  $('#toolNotes').classList.toggle('on',S.pencil);
+  timerEl.textContent=fmt(S.time);
+  startTimer(); show('#game'); renderBoard();
+  return true;
+}
+if(hasSave()) $('#btnContinue').disabled=false;
+
+/* ---------- input ---------- */
+boardEl.addEventListener('click',e=>{
+  const b=e.target.closest('.cell'); if(!b||S.paused) return;
+  selectCell(+b.dataset.r,+b.dataset.c);
+});
+boardEl.addEventListener('keydown',e=>{
+  const b=e.target.closest('.cell'); if(!b) return;
+  const mv={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];
+  if(!mv) return;
+  e.preventDefault();
+  const nr=(+b.dataset.r+mv[0]+9)%9, nc=(+b.dataset.c+mv[1]+9)%9;
+  cell(nr,nc).focus(); selectCell(nr,nc);
+});
+document.addEventListener('keydown',e=>{
+  if(!$('#game').classList.contains('on')||S.paused||S.over) return;
+  if(e.target.matches('input,textarea')) return;
+  if(e.key>='1'&&e.key<='9') place(+e.key);
+  else if(e.key==='Backspace'||e.key==='Delete'){ e.preventDefault(); erase(); }
+  else if(e.key==='n'||e.key==='N') togglePencil();
+});
+keysEl.addEventListener('click',e=>{ const k=e.target.closest('.key'); if(k) place(+k.dataset.d); });
+$('#toolNotes').addEventListener('click',togglePencil);
+$('#toolErase').addEventListener('click',erase);
+
+/* ---------- menus & dialogs ---------- */
+$('#btnPlay').addEventListener('click',()=>show('#difficulty'));
+$('#btnContinue').addEventListener('click',()=>{ if(!loadSave()){ $('#btnContinue').disabled=true; } });
+$('#btnHow').addEventListener('click',()=>$('#dlgHow').showModal());
+$('#btnSettings').addEventListener('click',()=>$('#dlgSettings').showModal());
+$('#volume').addEventListener('input',e=>$('#volVal').textContent=e.target.value+'%');
+$('#btnDiffBack').addEventListener('click',()=>show('#menu'));
+$$('.diff').forEach(b=>b.addEventListener('click',()=>newGame(b.dataset.d)));
+function pause(){ if(S.over)return; S.paused=true; $('#game').classList.add('paused'); $('#dlgPause').showModal(); }
+$('#btnPause').addEventListener('click',pause);
+$('#btnResume').addEventListener('click',()=>{ S.paused=false; $('#game').classList.remove('paused'); $('#dlgPause').close(); });
+$('#dlgPause').addEventListener('close',()=>{ if(S.paused){ S.paused=false; $('#game').classList.remove('paused'); } });
+$('#btnPauseMenu').addEventListener('click',()=>{ $('#dlgPause').close(); toMenu(); });
+$('#btnRetry').addEventListener('click',()=>{
+  $('#dlgOver').close();
+  S.lives=3; S.over=false; S.last=null;
+  S.marks=S.puzzle.map(o=>o.map(()=>null));
+  S.notes=S.puzzle.map(o=>o.map(()=>[]));
+  renderBoard(); save();
+});
+$('#btnOverMenu').addEventListener('click',()=>{ $('#dlgOver').close(); clearSave(); toMenu(); });
+$('#btnAgain').addEventListener('click',()=>{ $('#dlgWin').close(); show('#difficulty'); });
+$('#btnWinMenu').addEventListener('click',()=>{ $('#dlgWin').close(); toMenu(); });
+$('#btnMenu').addEventListener('click',toMenu);
+function toMenu(){ stopTimer(); S.paused=false; $('#game').classList.remove('paused'); if(!S.over&&S.solution) save(); $('#btnContinue').disabled=!hasSave(); show('#menu'); }
+})();
+</script>
+</body>
+</html>
